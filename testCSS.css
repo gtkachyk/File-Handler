@@ -1,0 +1,25 @@
+
+/*
+.scroll-bar:vertical{
+    -fx-background-color: white;
+    -fx-border-color: white;
+}
+
+.scroll-bar:horizontal{
+    -fx-background-color: white;
+    -fx-border-color: white;
+}
+
+.track-background{
+    -fx-background-color: black;
+    -fx-border-color: black;
+}
+
+#viewAnchorPane{
+    -fx-border-color: black;
+}
+
+
+.text-area{
+    -fx-background-color: white;
+}

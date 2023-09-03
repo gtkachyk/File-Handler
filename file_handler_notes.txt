@@ -1,0 +1,1 @@
+- Make sure the VM option '--module-path "C:\Program Files\Java\javafx-sdk-20.0.2\lib" --add-modules=javafx.base,javafx.controls,javafx.fxml,javafx.graphics' is added to the 'Driver' run configuration.
