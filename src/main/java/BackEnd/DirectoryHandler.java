@@ -28,15 +28,18 @@ public class DirectoryHandler{
 
     // Flags.
     // Source directory specific flags.
+    private boolean sourceIsValidFlag;
     private boolean nullSourceDirectoryFlag, nonExistentSourceDirectoryFlag, sourceIsNotDirectoryFlag, sourceIsNotReadableFlag;
 
     // Target directory specific flags.
+    private boolean targetIsValidFlag;
     private boolean nullTargetDirectoryFlag, nonExistentTargetDirectoryFlag, targetIsNotDirectoryFlag, targetIsNotReadableFlag;
 
     // Source and target directory flags.
     private boolean sourceEqualsTargetFlag;
 
     // sourceFiles and targetFiles flags.
+    private boolean sourceFilesIsValidSet, targetFilesIsValidSet;
     private boolean nullSourceFilesFlag, sourceFilesHasInvalidFileFlag, nullTargetFilesFlag, targetFilesHasInvalidFileFlag;
 
     // Filter flags.
@@ -74,8 +77,11 @@ public class DirectoryHandler{
      * Restores the original value of all DirectoryHandler flags.
      */
     private void resetFlags(){
+        sourceIsValidFlag = false;
         nullSourceDirectoryFlag = nonExistentSourceDirectoryFlag = sourceIsNotDirectoryFlag = sourceIsNotReadableFlag = true;
+        targetIsValidFlag = false;
         nullTargetDirectoryFlag = nonExistentTargetDirectoryFlag = targetIsNotDirectoryFlag = targetIsNotReadableFlag = true;
+        sourceFilesIsValidSet = targetFilesIsValidSet = true;
         nullSourceFilesFlag = sourceFilesHasInvalidFileFlag = nullTargetFilesFlag = targetFilesHasInvalidFileFlag = false;
         sourceEqualsTargetFlag = true;
         invalidFilterFlag = invalidUndoRequestFlag = false;
@@ -85,7 +91,7 @@ public class DirectoryHandler{
      * Checks if sourceDirectory and targetDirectory are the same object. Updates sourceEqualsTargetFlag.
      * @return true if sourceDirectory and targetDirectory are the same, false otherwise.
      */
-    private boolean sourceEqualsTargetTest(){
+    boolean sourceEqualsTargetTest(){
         if(Objects.equals(sourceDirectory, targetDirectory)){
             setSourceEqualsTargetFlag(true);
             return true;
@@ -132,10 +138,10 @@ public class DirectoryHandler{
         filterRecord = new Stack<>();
         filterRecordUnformatted = new Stack<>();
 
-        nullSourceDirectoryFlag = true;
-        nonExistentSourceDirectoryFlag = true;
-        sourceIsNotDirectoryFlag = true;
-        sourceIsNotReadableFlag = true;
+        sourceIsValidFlag = false;
+        nullSourceDirectoryFlag = nonExistentSourceDirectoryFlag = sourceIsNotDirectoryFlag = sourceIsNotReadableFlag = true;
+        sourceFilesIsValidSet = true;
+        nullSourceFilesFlag = sourceFilesHasInvalidFileFlag = false;
     }
 
     /**
@@ -145,8 +151,10 @@ public class DirectoryHandler{
     boolean isSourceFilesValid(){
         setSourceFilesHasInvalidFileFlag(false);
         setNullSourceFilesFlag(false);
+        setSourceFilesIsValidSet(true);
         if(sourceFiles == null){
             setNullSourceFilesFlag(true);
+            setSourceFilesIsValidSet(false);
             return false;
         }
         if(sourceFiles.size() == 0){
@@ -155,6 +163,7 @@ public class DirectoryHandler{
         for(int i = 0; i < sourceFiles.size(); i++){
             if(!isValidSourceDirectoryFile(sourceFiles.get(i))){
                 setSourceFilesHasInvalidFileFlag(true);
+                setSourceFilesIsValidSet(false);
                 return false;
             }
         }
@@ -186,38 +195,56 @@ public class DirectoryHandler{
      * Updates sourceFiles by replacing the entire set of files with a new set.
      * Invalid source directory files are filtered out of newFiles prior to replacement.
      * Precondition: sourceDirectory is valid.
+     * Postcondition: sourceFiles is a valid set.
      * @param newFiles An array of files to replace the current set.
      */
     private void replaceSourceFiles(File[] newFiles){
-        ArrayList<File> newSourceFiles = new ArrayList<>();
-        ArrayList<String> newSourceFileNames = new ArrayList<>();
-        for(int i = 0; i < newFiles.length; i++){
-            if(isValidSourceDirectoryFile(newFiles[i])){
-                newSourceFiles.add(newFiles[i]);
-                newSourceFileNames.add(newFiles[i].getName());
+        if(newFiles != null){
+            ArrayList<File> newSourceFiles = new ArrayList<>();
+            ArrayList<String> newSourceFileNames = new ArrayList<>();
+            for(int i = 0; i < newFiles.length; i++){
+                if(isValidSourceDirectoryFile(newFiles[i])){
+                    newSourceFiles.add(newFiles[i]);
+                    newSourceFileNames.add(newFiles[i].getName());
+                }
             }
+            setSourceFiles(newSourceFiles);
+            setSourceFileNames(newSourceFileNames);
         }
-        setSourceFiles(newSourceFiles);
-        setSourceFileNames(newSourceFileNames);
+        else {
+            setSourceFiles(new ArrayList<File>());
+        }
+        setNullSourceFilesFlag(false);
+        setSourceFilesHasInvalidFileFlag(false);
+        setSourceFilesIsValidSet(true);
     }
 
     /**
      * Updates sourceFiles by replacing the entire set of files with a new set.
      * Invalid source directory files are filtered out of newFiles prior to the replacement.
      * Precondition: sourceDirectory is valid.
+     * Postcondition: sourceFiles is a valid set.
      * @param newFiles An ArrayList of files to replace the current set.
      */
     private void replaceSourceFiles(ArrayList<File> newFiles){
-        ArrayList<File> newSourceFiles = new ArrayList<>();
-        ArrayList<String> newSourceFileNames = new ArrayList<>();
-        for(int i = 0; i < newFiles.size(); i++){
-            if(isValidSourceDirectoryFile(newFiles.get(i))){
-                newSourceFiles.add(newFiles.get(i));
-                newSourceFileNames.add(newFiles.get(i).getName());
+        if(newFiles != null){
+            ArrayList<File> newSourceFiles = new ArrayList<>();
+            ArrayList<String> newSourceFileNames = new ArrayList<>();
+            for(int i = 0; i < newFiles.size(); i++){
+                if(isValidSourceDirectoryFile(newFiles.get(i))){
+                    newSourceFiles.add(newFiles.get(i));
+                    newSourceFileNames.add(newFiles.get(i).getName());
+                }
             }
+            setSourceFiles(newSourceFiles);
+            setSourceFileNames(newSourceFileNames);
         }
-        setSourceFiles(newSourceFiles);
-        setSourceFileNames(newSourceFileNames);
+        else {
+            setSourceFiles(new ArrayList<File>());
+        }
+        setNullSourceFilesFlag(false);
+        setSourceFilesHasInvalidFileFlag(false);
+        setSourceFilesIsValidSet(true);
     }
 
     /**
@@ -269,6 +296,7 @@ public class DirectoryHandler{
             setNonExistentSourceDirectoryFlag(true);
             setSourceIsNotDirectoryFlag(true);
             setSourceIsNotReadableFlag(true);
+            setSourceIsValidFlag(false);
             return false;
         }
         else{
@@ -289,6 +317,7 @@ public class DirectoryHandler{
             setNonExistentSourceDirectoryFlag(true);
             setSourceIsNotDirectoryFlag(true);
             setSourceIsNotReadableFlag(true);
+            setSourceIsValidFlag(false);
             return false;
         }
         else{
@@ -309,6 +338,7 @@ public class DirectoryHandler{
             setNonExistentSourceDirectoryFlag(false);
             setSourceIsNotDirectoryFlag(true);
             setSourceIsNotReadableFlag(true);
+            setSourceIsValidFlag(false);
             return false;
         }
         else{
@@ -329,6 +359,7 @@ public class DirectoryHandler{
             setNonExistentSourceDirectoryFlag(false);
             setSourceIsNotDirectoryFlag(false);
             setSourceIsNotReadableFlag(true);
+            setSourceIsValidFlag(false);
             return false;
         }
         else{
@@ -349,9 +380,11 @@ public class DirectoryHandler{
             setNonExistentSourceDirectoryFlag(false);
             setSourceIsNotDirectoryFlag(false);
             setSourceIsNotReadableFlag(false);
+            setSourceIsValidFlag(true);
             return true;
         }
         else{
+            setSourceIsValidFlag(false);
             return false;
         }
     }
@@ -417,10 +450,10 @@ public class DirectoryHandler{
         targetFileNames = new ArrayList<>();
         targetFileRecord = new ArrayList<>();
 
-        nullTargetDirectoryFlag = true;
-        nonExistentTargetDirectoryFlag = true;
-        targetIsNotDirectoryFlag = true;
-        targetIsNotReadableFlag = true;
+        targetIsValidFlag = false;
+        nullTargetDirectoryFlag = nonExistentTargetDirectoryFlag = targetIsNotDirectoryFlag = targetIsNotReadableFlag = true;
+        targetFilesIsValidSet = true;
+        nullTargetFilesFlag = targetFilesHasInvalidFileFlag = false;
     }
 
     /**
@@ -430,8 +463,10 @@ public class DirectoryHandler{
     boolean isTargetFilesValid(){
         setNullTargetFilesFlag(false);
         setTargetFilesHasInvalidFileFlag(false);
+        setTargetFilesIsValidSet(true);
         if(targetFiles == null){
             setNullTargetFilesFlag(true);
+            setTargetFilesIsValidSet(false);
             return false;
         }
         if(targetFiles.size() == 0){
@@ -440,6 +475,7 @@ public class DirectoryHandler{
         for(int i = 0; i < targetFiles.size(); i++){
             if(!isValidTargetDirectoryFile(targetFiles.get(i))){
                 setTargetFilesHasInvalidFileFlag(true);
+                setTargetFilesIsValidSet(false);
                 return false;
             }
         }
@@ -471,38 +507,56 @@ public class DirectoryHandler{
      * Updates targetFiles by replacing the entire set of files with a new set.
      * Invalid target directory files are filtered out of newFiles prior to the replacement.
      * Precondition: targetDirectory is valid.
+     * Postcondition: targetFiles is a valid set.
      * @param newFiles An array of files to replace the current set.
      */
     private void replaceTargetFiles(File[] newFiles){
-        ArrayList<File> newTargetFiles = new ArrayList<>();
-        ArrayList<String> newTargetFileNames = new ArrayList<>();
-        for(int i = 0; i < newFiles.length; i++){
-            if(isValidTargetDirectoryFile(newFiles[i])){
-                newTargetFiles.add(newFiles[i]);
-                newTargetFileNames.add(newFiles[i].getName());
+        if(newFiles != null){
+            ArrayList<File> newTargetFiles = new ArrayList<>();
+            ArrayList<String> newTargetFileNames = new ArrayList<>();
+            for(int i = 0; i < newFiles.length; i++){
+                if(isValidTargetDirectoryFile(newFiles[i])){
+                    newTargetFiles.add(newFiles[i]);
+                    newTargetFileNames.add(newFiles[i].getName());
+                }
             }
+            setTargetFiles(newTargetFiles);
+            setTargetFileNames(newTargetFileNames);
         }
-        setTargetFiles(newTargetFiles);
-        setTargetFileNames(newTargetFileNames);
+        else {
+            setTargetFiles(new ArrayList<File>());
+        }
+        setNullTargetFilesFlag(false);
+        setTargetFilesHasInvalidFileFlag(false);
+        setTargetFilesIsValidSet(true);
     }
 
     /**
      * Updates targetFiles by replacing the entire set of files with a new set.
      * Invalid target directory files are filtered out of newFiles prior to the replacement.
      * Precondition: targetDirectory is valid.
+     * Postcondition: targetFiles is a valid set.
      * @param newFiles An ArrayList of files to replace the current set.
      */
     private void replaceTargetFiles(ArrayList<File> newFiles){
-        ArrayList<File> newTargetFiles = new ArrayList<>();
-        ArrayList<String> newTargetFileNames = new ArrayList<>();
-        for(int i = 0; i < newFiles.size(); i++){
-            if(isValidTargetDirectoryFile(newFiles.get(i))){
-                newTargetFiles.add(newFiles.get(i));
-                newTargetFileNames.add(newFiles.get(i).getName());
+        if(newFiles != null){
+            ArrayList<File> newTargetFiles = new ArrayList<>();
+            ArrayList<String> newTargetFileNames = new ArrayList<>();
+            for(int i = 0; i < newFiles.size(); i++){
+                if(isValidTargetDirectoryFile(newFiles.get(i))){
+                    newTargetFiles.add(newFiles.get(i));
+                    newTargetFileNames.add(newFiles.get(i).getName());
+                }
             }
+            setTargetFiles(newTargetFiles);
+            setTargetFileNames(newTargetFileNames);
         }
-        setTargetFiles(newTargetFiles);
-        setTargetFileNames(newTargetFileNames);
+        else{
+            setTargetFiles(new ArrayList<File>());
+        }
+        setNullTargetFilesFlag(false);
+        setTargetFilesHasInvalidFileFlag(false);
+        setTargetFilesIsValidSet(true);
     }
 
     /**
@@ -552,6 +606,7 @@ public class DirectoryHandler{
             setNonExistentTargetDirectoryFlag(true);
             setTargetIsNotDirectoryFlag(true);
             setTargetIsNotReadableFlag(true);
+            setTargetIsValidFlag(false);
             return false;
         }
         else{
@@ -572,6 +627,7 @@ public class DirectoryHandler{
             setNonExistentTargetDirectoryFlag(true);
             setTargetIsNotDirectoryFlag(true);
             setTargetIsNotReadableFlag(true);
+            setTargetIsValidFlag(false);
             return false;
         }
         else{
@@ -592,6 +648,7 @@ public class DirectoryHandler{
             setNonExistentTargetDirectoryFlag(false);
             setTargetIsNotDirectoryFlag(true);
             setTargetIsNotReadableFlag(true);
+            setTargetIsValidFlag(false);
             return false;
         }
         else{
@@ -612,6 +669,7 @@ public class DirectoryHandler{
             setNonExistentTargetDirectoryFlag(false);
             setTargetIsNotDirectoryFlag(false);
             setTargetIsNotReadableFlag(true);
+            setTargetIsValidFlag(false);
             return false;
         }
         else{
@@ -632,9 +690,11 @@ public class DirectoryHandler{
             setNonExistentTargetDirectoryFlag(false);
             setTargetIsNotDirectoryFlag(false);
             setTargetIsNotReadableFlag(false);
+            setTargetIsValidFlag(true);
             return true;
         }
         else{
+            setTargetIsValidFlag(false);
             return false;
         }
     }
@@ -1167,6 +1227,14 @@ public class DirectoryHandler{
 
     // --------------------------------------------- Flags --------------------------------------------------------
 
+    public boolean isSourceIsValidFlag() {
+        return sourceIsValidFlag;
+    }
+
+    private void setSourceIsValidFlag(boolean sourceIsValidFlag) {
+        this.sourceIsValidFlag = sourceIsValidFlag;
+    }
+
     public boolean isNullSourceDirectoryFlag(){
         return nullSourceDirectoryFlag;
     }
@@ -1197,6 +1265,14 @@ public class DirectoryHandler{
 
     private void setSourceIsNotReadableFlag(boolean sourceIsNotReadableFlag) {
         this.sourceIsNotReadableFlag = sourceIsNotReadableFlag;
+    }
+
+    public boolean isTargetIsValidFlag() {
+        return targetIsValidFlag;
+    }
+
+    private void setTargetIsValidFlag(boolean targetIsValidFlag) {
+        this.targetIsValidFlag = targetIsValidFlag;
     }
 
     public boolean isNullTargetDirectoryFlag(){
@@ -1231,6 +1307,30 @@ public class DirectoryHandler{
         this.targetIsNotReadableFlag = targetIsNotReadableFlag;
     }
 
+    public boolean isSourceEqualsTargetFlag(){
+        return sourceEqualsTargetFlag;
+    }
+
+    private void setSourceEqualsTargetFlag(Boolean sourceEqualsTargetFlag){
+        this.sourceEqualsTargetFlag = sourceEqualsTargetFlag;
+    }
+
+    public boolean isSourceFilesIsValidSet() {
+        return sourceFilesIsValidSet;
+    }
+
+    private void setSourceFilesIsValidSet(boolean sourceFilesIsValidSet) {
+        this.sourceFilesIsValidSet = sourceFilesIsValidSet;
+    }
+
+    public boolean isTargetFilesIsValidSet() {
+        return targetFilesIsValidSet;
+    }
+
+    private void setTargetFilesIsValidSet(boolean targetFilesIsValidSet) {
+        this.targetFilesIsValidSet = targetFilesIsValidSet;
+    }
+
     public boolean isNullSourceFilesFlag() {
         return nullSourceFilesFlag;
     }
@@ -1261,14 +1361,6 @@ public class DirectoryHandler{
 
     private void setTargetFilesHasInvalidFileFlag(boolean targetFilesHasInvalidFileFlag) {
         this.targetFilesHasInvalidFileFlag = targetFilesHasInvalidFileFlag;
-    }
-
-    public boolean isSourceEqualsTargetFlag(){
-        return sourceEqualsTargetFlag;
-    }
-
-    private void setSourceEqualsTargetFlag(Boolean sourceEqualsTargetFlag){
-        this.sourceEqualsTargetFlag = sourceEqualsTargetFlag;
     }
 
     public boolean isInvalidFilterFlag() {

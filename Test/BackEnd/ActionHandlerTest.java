@@ -52,6 +52,14 @@ class ActionHandlerTest { // Precondition: device is running Windows 11 Home, an
     private final String drive_letter_C_PATH = "C:\\";
     private final String drive_letter_D_PATH = "D:\\";
 
+    private final ArrayList<File> copy_test_folder_1_Files = new ArrayList<File>(Arrays.asList(new File("C:\\Users\\gtkac\\Desktop\\Paperwork\\Program Test Files\\file_handler_test_folders\\file_handler_copy_test_folders\\copy_test_folder_1\\Bio 218 Assignment 4 Drawing.jpg"),
+                                                                                            new File("C:\\Users\\gtkac\\Desktop\\Paperwork\\Program Test Files\\file_handler_test_folders\\file_handler_copy_test_folders\\copy_test_folder_1\\localWorldTest.txt"),
+                                                                                            new File("C:\\Users\\gtkac\\Desktop\\Paperwork\\Program Test Files\\file_handler_test_folders\\file_handler_copy_test_folders\\copy_test_folder_1\\Octopus attack (2).jpg"),
+                                                                                            new File("C:\\Users\\gtkac\\Desktop\\Paperwork\\Program Test Files\\file_handler_test_folders\\file_handler_copy_test_folders\\copy_test_folder_1\\Octopus.png")));
+    private ArrayList<File> copy_test_folder_1_Files_Copy(){
+        return new ArrayList<File>(copy_test_folder_1_Files);
+    }
+
     // BackEnd objects.
     private DirectoryHandler directoryHandler;
     private ActionHandler actionHandler;
@@ -1201,6 +1209,83 @@ class ActionHandlerTest { // Precondition: device is running Windows 11 Home, an
         );
         writer.close();
     }
+
+    // -----------------------------------------------------------------------------------------------------------------------
+    // --------------------------------------------- deleteFromSource tests --------------------------------------------------
+    // -----------------------------------------------------------------------------------------------------------------------
+
+    @Test
+    void deleteFromSource_SuccessTest() throws IOException {
+        copyFileTestInitialize();
+        directoryHandler.processNewSourceDirectory(copy_test_folder_1);
+        assertTrue(actionHandler.deleteFromSourceActionPermitted());
+
+        ArrayList<File> expectSourceFiles = copy_test_folder_1_Files_Copy();
+        assertEquals(expectSourceFiles, directoryHandler.sourceFilesCopy());
+        expectSourceFiles.remove(0);
+        expectSourceFiles.remove(0);
+        expectSourceFiles.remove(0);
+        expectSourceFiles.remove(0);
+
+        actionHandler.deleteFromSource();
+
+        assertAll(
+                // Parameters
+                () -> assertEquals(expectSourceFiles, directoryHandler.sourceFilesCopy()),
+
+                // Flags
+                () -> assertFalse(actionHandler.isDeleteFromSourceDidNotCompleteFlag())
+        );
+
+    }
+
+    @Test
+    void deleteFromSource_FailTest() throws IOException {
+        copyFileTestInitialize();
+        directoryHandler.processNewSourceDirectory(copy_test_folder_1);
+        assertTrue(actionHandler.deleteFromSourceActionPermitted());
+
+        ArrayList<File> expectSourceFiles = new ArrayList<>();
+        expectSourceFiles.add(new File("C:\\Users\\gtkac\\Desktop\\Paperwork\\Program Test Files\\file_handler_test_folders\\file_handler_copy_test_folders\\copy_test_folder_1\\bio_thingy.png"));
+
+        if(directoryHandler.sourceFilesCopy().get(3).renameTo(new File(copy_test_folder_1_PATH + "\\bio_thingy.png"))){
+            actionHandler.deleteFromSource();
+
+            assertAll(
+                    // Parameters
+                    () -> assertEquals(expectSourceFiles, directoryHandler.sourceFilesCopy()),
+
+                    // Flags
+                    () -> assertTrue(actionHandler.isDeleteFromSourceDidNotCompleteFlag())
+            );
+        }
+        else{
+            fail();
+        }
+    }
+
+    // Manuel tests completed:
+    // Test 1: Delete a file that would be deleted by deleteFromSource before deleteFromSource is called, without refreshing first.
+    // Result 1: Error code 3.0: invalid source files.
+    // Test 2: Add a file that would be deleted by deleteFromSource before deleteFromSource is called, without refreshing first.
+    // Result 2: Operation successful, additional file was not deleted.
+    // Test 3: Delete a file contained in a directory with objects not handled by File Handler (directories were used).
+    // Result 3: Operation successful, only the correct file was deleted (the subdirectories also contained unharmed copies of the file that was deleted).
+    // Test 4: Run program from .jar file and delete it.
+    // Result 4: Error code 3.1.
+    // Test 5: Try to delete files without a source selected (only target selected).
+    // Result 5: Error 3.0: invalid source directory.
+    // Test 6: Try to delete files when source = target.
+    // Result 6: Error code 3.1: source = target directory.
+    // Test 7: Try to delete files when source = target and source is empty.
+    // Result 7: Error code 3.1: source = target directory.
+    // Test 8: Try to delete all files in source after reordering source in OS file explorer without refreshing first.
+    // Result 8: Operation successful.
+    // Test 9: Deleted a file with no extension (type 'File').
+    // Result 9: Operation successful.
+    // Test 10: Move a file that would be deleted by deleteFromSource before deleteFromSource is called, without refreshing first.
+    // Result 10: Error code 3.0: invalid source files.
+
 
     // -----------------------------------------------------------------------------------------------------------------------
     // --------------------------------------------- generateCopyFilesErrorMessage tests -------------------------------------

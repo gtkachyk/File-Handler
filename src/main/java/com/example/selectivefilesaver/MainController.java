@@ -8,6 +8,9 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
+import javafx.event.Event;
+import javafx.event.EventHandler;
+import javafx.event.EventType;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
@@ -16,6 +19,8 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
@@ -24,6 +29,8 @@ import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import javafx.util.Pair;
 
+import javax.xml.stream.EventFilter;
+import javax.xml.stream.events.XMLEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -32,6 +39,7 @@ public class MainController {
 
     // Constants
     private final String DIRECTORY_ACTION_1 = "Copy to folder";
+    private final String DIRECTORY_ACTION_2 = "Delete from source";
     private final String FILTER_1 = "Include by name";
     private final String FILTER_2 = "Include by extension";
     private final String FILTER_3 = "Exclude by name";
@@ -168,7 +176,7 @@ public class MainController {
         viewTextArea.setPrefWidth(VIEW_TEXT_AREA_INITIAL_WIDTH);
 
         // Set global data.
-        setSelectActionComboBoxOptions(new String[]{DIRECTORY_ACTION_1});
+        setSelectActionComboBoxOptions(new String[]{DIRECTORY_ACTION_1, DIRECTORY_ACTION_2});
         setSelectFilterOptions(new String[]{FILTER_1, FILTER_2, FILTER_3, FILTER_4});
         setCurrentAction(null);
         setCurrentFilter(null);
@@ -219,21 +227,43 @@ public class MainController {
 
     /**
      * Formats an Alert with predefined properties. The alert will have the default header text.
+     * @param alert the alert to format.
+     * @return alert with updated properties.
      */
     private Alert createAlert(Alert alert){
+        // Prevent closing with any key.
+        DialogPane dialogPane = alert.getDialogPane();
+        dialogPane.addEventFilter(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+            @Override
+            public void handle(KeyEvent keyEvent) {
+                keyEvent.consume();
+            }
+        });
+
         alert.setResizable(true);
         alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
         alert.getDialogPane().setMinWidth(Region.USE_PREF_SIZE);
         Scene scene = alert.getDialogPane().getScene();
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("alertStyles.css")).toExternalForm());
         return alert;
-        // alert.showAndWait();
     }
 
     /**
      * Formats an Alert with predefined properties. The alert will have custom header text.
+     * @param alert the alert to format.
+     * @param headerText the header text to add to alert.
+     * @return alert with updated properties.
      */
     private Alert createAlert(Alert alert, String headerText){
+        // Prevent closing with any key.
+        DialogPane dialogPane = alert.getDialogPane();
+        dialogPane.addEventFilter(KeyEvent.KEY_PRESSED, new EventHandler<KeyEvent>() {
+            @Override
+            public void handle(KeyEvent keyEvent) {
+                keyEvent.consume();
+            }
+        });
+
         alert.setHeaderText(headerText);
         alert.setResizable(true);
         alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
@@ -241,7 +271,6 @@ public class MainController {
         Scene scene = alert.getDialogPane().getScene();
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("alertStyles.css")).toExternalForm());
         return alert;
-//        alert.showAndWait();
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -392,6 +421,24 @@ public class MainController {
     }
 
     /**
+     * Reflects changes to sourceDirectory in the GUI and directoryHandler.
+     * @return true if the source directory is valid after refreshing, false otherwise.
+     */
+    @FXML
+    boolean refreshSourceDirectory(){
+        boolean sourceRefreshSuccessful = directoryHandler.refreshSourceDirectory();
+
+        updateViewPanel();
+        actionLogTextArea.appendText("Source directory refreshed.\n");
+
+        if(!sourceRefreshSuccessful){
+            createAlert(new Alert(Alert.AlertType.WARNING, BackEndErrors.WARNING_1_0.toString(), ButtonType.OK), "Warning (code 1.0)").showAndWait();
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Handles the process of quiting the application.
      */
     @FXML
@@ -484,10 +531,19 @@ public class MainController {
     }
 
     /**
-     * Applies the selected action when 'run' is pressed.
+     * Appends each entry in actionHandler.deleteFromSourceRecord to the action log.
      */
-    @FXML
-    private void setRunButton() {
+    private void printDeleteFromSourceRecordToActionLog(){
+        for(String deleteAction: actionHandler.deleteFromSourceRecord){
+            actionLogTextArea.appendText(deleteAction + "\n");
+        }
+        actionHandler.deleteFromSourceRecord.clear();
+    }
+
+    /**
+     * Performs a copy action. User must acknowledge a confirmation before action.
+     */
+    private void runCopyAction(){
         String confirmationMessage = actionHandler.generateCopyConfirmationMessage();
         if(confirmationMessage != null){
             Alert confirmation = createAlert(new Alert(Alert.AlertType.CONFIRMATION, confirmationMessage), "Confirm copy operation");
@@ -511,6 +567,57 @@ public class MainController {
         }
         else{
             createAlert(new Alert(Alert.AlertType.ERROR, actionHandler.generateCopyActionPermittedErrorMessage(), ButtonType.OK), "Error (code 1.0)").showAndWait();
+        }
+    }
+
+    /**
+     * Performs delete from source action. User must acknowledge a warning and confirmation before action.
+     */
+    private void runDeleteFromSourceAction(){
+        Alert warningAlert = createAlert(new Alert(Alert.AlertType.WARNING, "All visible source directory files will be deleted WITHOUT being sent to the recycle bin. If you want to recover a deleted file STOP USING THE COMPUTER IMMEDIATELY and contact a data recovery specialist."), "Warning");
+        warningAlert.setX(100); // Makes sure that the first and second confirmation buttons aren't too close.
+        Optional<ButtonType> warningResult = warningAlert.showAndWait();
+        if(warningResult.isPresent() && warningResult.get() == ButtonType.OK){
+            String confirmationMessage = actionHandler.generateDeleteConfirmationMessage();
+            if(confirmationMessage != null){
+                Alert confirmation = createAlert(new Alert(Alert.AlertType.CONFIRMATION, confirmationMessage), "Confirm delete operation");
+                Optional<ButtonType> confirmationResult = confirmation.showAndWait();
+                if(confirmationResult.isPresent() && confirmationResult.get() == ButtonType.OK){
+                    if(actionHandler.deleteFromSourceActionPermitted()){
+                        if(!actionHandler.deleteFromSource()){
+                            Pair<String, String> errorMessage = actionHandler.generateDeleteFromSourceErrorMessage();
+                            createAlert(new Alert(Alert.AlertType.ERROR, errorMessage.getKey(), ButtonType.OK), errorMessage.getValue()).showAndWait();
+                        }
+                        printDeleteFromSourceRecordToActionLog();
+                        refreshSourceDirectory();
+                    }
+                    else{
+                        createAlert(new Alert(Alert.AlertType.ERROR, actionHandler.generateDeleteFromSourceActionPermittedErrorMessage(), ButtonType.OK), "Error (code 3.0)").showAndWait();
+                    }
+                }
+                else{
+                    actionLogTextArea.appendText("Delete action cancelled at confirmation alert.\n");
+                }
+            }
+            else{
+                createAlert(new Alert(Alert.AlertType.ERROR, actionHandler.generateDeleteFromSourceActionPermittedErrorMessage(), ButtonType.OK), "Error (code 3.0)").showAndWait();
+            }
+        }
+        else{
+            actionLogTextArea.appendText("Delete action cancelled at warning alert.\n");
+        }
+    }
+
+    /**
+     * Applies the selected action when 'run' is pressed.
+     */
+    @FXML
+    private void setRunButton() {
+        if(Objects.equals(currentAction, DIRECTORY_ACTION_1)){
+            runCopyAction();
+        }
+        else if(Objects.equals(currentAction, DIRECTORY_ACTION_2)){
+            runDeleteFromSourceAction();
         }
     }
 

@@ -15,7 +15,11 @@ public enum BackEndErrors {
 
     // Filter errors.
     ERROR_2_0("Invalid filter request."),
-    ERROR_2_1("There are no filter applications to undo.");
+    ERROR_2_1("There are no filter applications to undo."),
+
+    // Delete from source action errors.
+    ERROR_3_0("The requested delete operation was not permitted because one or more safety checks failed."),
+    ERROR_3_1("The requested delete operation did not fully finish. See action log for details.");
 
     String message;
 

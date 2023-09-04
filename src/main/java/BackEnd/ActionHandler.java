@@ -20,6 +20,7 @@ public class ActionHandler {
 
     // Fields for copying operations.
     public Stack<String> copyRecord;
+    public Stack<String> deleteFromSourceRecord;
     private String fileThatCausedException; // The name of the file that was being copied when an exception was thrown in copyFiles().
 
     // Flags.
@@ -28,6 +29,9 @@ public class ActionHandler {
 
     // copyFiles flags.
     private boolean copyFilesNullPointerExceptionFlag, copyFilesIllegalArgumentExceptionFlag, copyFilesFileNotFoundExceptionFlag, copyFilesIOExceptionFlag;
+
+    // deleteFromSource flags.
+    private boolean deleteFromSourceDidNotCompleteFlag;
 
     /**
      * Constructor sets the default values of all variables and flags.
@@ -48,6 +52,7 @@ public class ActionHandler {
      */
     private void resetVariables(){
         copyRecord = new Stack<>();
+        deleteFromSourceRecord = new Stack<>();
         fileThatCausedException = null;
     }
 
@@ -57,6 +62,7 @@ public class ActionHandler {
     private void resetFlags(){
         notEnoughDiskSpaceFlag = noSourceFilesFlag = sourceTargetDuplicatesFlag = false;
         copyFilesNullPointerExceptionFlag = copyFilesIllegalArgumentExceptionFlag = copyFilesFileNotFoundExceptionFlag = copyFilesIOExceptionFlag = false;
+        deleteFromSourceDidNotCompleteFlag = false;
     }
 
     /**
@@ -92,11 +98,27 @@ public class ActionHandler {
     }
 
     /**
+     * Checks if the current source directory is valid.
+     * @return true if source is valid, false otherwise.
+     */
+    private boolean sourceDirectoryIsValid(){
+        return directoryHandler.directoryIsValidSource(directoryHandler.sourceDirectoryCopy());
+    }
+
+    /**
      * Checks if the current source and target files are valid sets.
      * @return true if both are valid, false otherwise.
      */
     private boolean sourceAndTargetFilesAreValid(){
         return directoryHandler.isSourceFilesValid() && directoryHandler.isTargetFilesValid();
+    }
+
+    /**
+     * Checks if the current source files is a valid set.
+     * @return true if source files is valid, false otherwise.
+     */
+    private boolean sourceFilesAreValid(){
+        return directoryHandler.isSourceFilesValid();
     }
 
     /**
@@ -167,15 +189,26 @@ public class ActionHandler {
     }
 
     /**
-     * Checks the following are true: current source and target directories and files are valid, target directory has sufficient usable space,
-     * source directory files contains at least one usable file, and no duplicate files between the source and target directories.
+     * Checks the following are true: current source and target directories and files are valid, source and target are not the same directory,
+     * target directory has sufficient usable space, source directory files contains at least one usable file,
+     * and no duplicate files between the source and target directories.
      * @return true if all the above are true, false otherwise.
      */
     public boolean copyActionPermitted(){
-        if(sourceAndTargetDirectoriesAreValid() && sourceAndTargetFilesAreValid()){
-            if(isDiskSpaceSufficient() & !isSourceFilesEmpty() && !sourceTargetDuplicates()){ // Space check, no files in source check, no duplicates check.
-                return true;
-            }
+        if(sourceAndTargetDirectoriesAreValid() && sourceAndTargetFilesAreValid() && !directoryHandler.sourceEqualsTargetTest() && isDiskSpaceSufficient() && !isSourceFilesEmpty() && !sourceTargetDuplicates()){
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks the following are true: current source directory and files are valid, source and target are not the same directory,
+     * source directory files contains at least one usable file.
+     * @return true if all the above are true, false otherwise.
+     */
+    public boolean deleteFromSourceActionPermitted(){
+        if(sourceDirectoryIsValid() && sourceFilesAreValid() && !directoryHandler.sourceEqualsTargetTest() && !isSourceFilesEmpty()){
+            return true;
         }
         return false;
     }
@@ -186,16 +219,18 @@ public class ActionHandler {
 
     /**
      * Copies the files in sourceFiles to targetFiles.
-     * IMPORTANT: developers should ensure that a call to copyActionPermitted() immediately precedes any execution of copyFiles to reduce the risk of data corruption and loss.
+     * Precondition: all requirements needed for copyActionPermitted() to evaluate to true are met.
      * Documentation for FileUtils.copyToDirectory: https://commons.apache.org/proper/commons-io/apidocs/org/apache/commons/io/FileUtils.html#copyToDirectory-java.io.File-java.io.File-
      * @return true if the operation was successful, false otherwise.
      */
     public boolean copyFiles() { // make it so this function (and all others) return boolean and sets a variable to hold stuff related to error messages and error message displaying.
         int i = 0;
+        ArrayList<File> sourceFilesCopy = directoryHandler.sourceFilesCopy();
+        File targetDirectoryCopy = directoryHandler.targetDirectoryCopy();
         try {
             for (i = 0; i < directoryHandler.sourceFilesSize(); i++) {
-                FileUtils.copyToDirectory(directoryHandler.sourceFilesCopy().get(i), directoryHandler.targetDirectoryCopy()); // Copy files from source to target.
-                copyRecord.add("Copied file '" + directoryHandler.sourceFilesCopy().get(i).getName() + "' to directory " + directoryHandler.getTargetDirectoryName());
+                FileUtils.copyToDirectory(sourceFilesCopy.get(i), targetDirectoryCopy); // Copy files from source to target.
+                copyRecord.add("Copied file '" + sourceFilesCopy.get(i).getName() + "' to directory " + directoryHandler.getTargetDirectoryName());
             }
             directoryHandler.refreshTargetDirectory();
             return true;
@@ -229,6 +264,36 @@ public class ActionHandler {
         }
     }
 
+    /**
+     * Deletes all files contained in directoryHandler.sourceFiles.
+     * Precondition: all requirements needed for deleteFromSourceActionPermitted() to evaluate to true are met.
+     * Postcondition: directoryHandler.sourceDirectory is valid.
+     * @return true if the operation was successful, false if failed or partially successful.
+     */
+    public boolean deleteFromSource(){
+        boolean operationFailed = false;
+        ArrayList<File> sourceFilesCopy = directoryHandler.sourceFilesCopy();
+        for (int i = 0; i < directoryHandler.sourceFilesSize(); i++) {
+            boolean deleteSuccessful = sourceFilesCopy.get(i).delete();
+            if(deleteSuccessful){
+                deleteFromSourceRecord.push("Deleted file '" + sourceFilesCopy.get(i).getName() + "' from source directory.");
+            }
+            else{
+                deleteFromSourceRecord.push("Could not delete file '" + sourceFilesCopy.get(i).getName() + "' from source directory.");
+                operationFailed = true;
+            }
+        }
+
+        if(operationFailed){
+            setDeleteFromSourceDidNotCompleteFlag(true);
+            directoryHandler.refreshSourceDirectory();
+            return false;
+        }
+        setDeleteFromSourceDidNotCompleteFlag(false);
+        directoryHandler.refreshSourceDirectory();
+        return true;
+    }
+
     // ------------------------------------------------------------------------------------------------------------
     // --------------------------------------------- Message functions --------------------------------------------
     // ------------------------------------------------------------------------------------------------------------
@@ -238,44 +303,66 @@ public class ActionHandler {
      * @return an error message if any errors were encountered, null otherwise.
      */
     public String generateCopyActionPermittedErrorMessage(){
-        StringBuilder nonExceptionErrorMessage = new StringBuilder();
-        if(directoryHandler.isNullSourceDirectoryFlag()){
-            nonExceptionErrorMessage.append("null source directory, ");
+        StringBuilder errorMessage = new StringBuilder();
+        if(!directoryHandler.isSourceIsValidFlag()){
+            errorMessage.append("invalid source directory, ");
         }
-        if(directoryHandler.isNullTargetDirectoryFlag()){
-            nonExceptionErrorMessage.append("null target directory, ");
+        else if(!directoryHandler.isTargetIsValidFlag()){
+            errorMessage.append("invalid target directory, ");
         }
-        if(directoryHandler.isNullSourceFilesFlag()){
-            nonExceptionErrorMessage.append("null source files, ");
+        else if(!directoryHandler.isSourceFilesIsValidSet()){
+            errorMessage.append("invalid source files, ");
         }
-        if(directoryHandler.isNullTargetFilesFlag()){
-            nonExceptionErrorMessage.append("null target files, ");
+        else if(!directoryHandler.isTargetFilesIsValidSet()){
+            errorMessage.append("invalid target files, ");
         }
-        if(directoryHandler.isSourceFilesHasInvalidFileFlag()){
-            nonExceptionErrorMessage.append("source files has invalid entry, ");
+        else if(directoryHandler.isSourceEqualsTargetFlag()){
+            errorMessage.append("source = target directory, ");
         }
-        if(directoryHandler.isTargetFilesHasInvalidFileFlag()){
-            nonExceptionErrorMessage.append("target files has invalid entry, ");
+        else if(isNotEnoughDiskSpaceFlag()){
+            errorMessage.append("insufficient disk space, ");
         }
-        if(directoryHandler.isSourceEqualsTargetFlag() && (!directoryHandler.isNullSourceDirectoryFlag() || !directoryHandler.isNullTargetDirectoryFlag())){
-            nonExceptionErrorMessage.append("source = target directory, ");
+        else if(isNoSourceFilesFlag()){
+            errorMessage.append("empty source directory, ");
         }
-        if(isNotEnoughDiskSpaceFlag() && !directoryHandler.isNullTargetDirectoryFlag()){
-            nonExceptionErrorMessage.append("insufficient disk space, ");
-        }
-        if(isNoSourceFilesFlag()){
-            nonExceptionErrorMessage.append("empty source directory, ");
-        }
-        if(isSourceTargetDuplicatesFlag()){
-            nonExceptionErrorMessage.append("duplicate files between source and target directory, ");
+        else if(isSourceTargetDuplicatesFlag()){
+            errorMessage.append("duplicate files between source and target directory, ");
         }
 
-        if(nonExceptionErrorMessage.isEmpty()){
+        if(errorMessage.isEmpty()){
             return null;
         }
         else{
-            nonExceptionErrorMessage.delete(nonExceptionErrorMessage.length() - 2, nonExceptionErrorMessage.length()); // This is supposed to remove the last ', ' from the error message.
-            return BackEndErrors.ERROR_1_0.toString() + " Errors: " + String.valueOf(nonExceptionErrorMessage) + ".";
+            errorMessage.delete(errorMessage.length() - 2, errorMessage.length()); // This is supposed to remove the last ', ' from the error message.
+            return BackEndErrors.ERROR_1_0.toString() + " Errors: " + String.valueOf(errorMessage) + ".";
+        }
+    }
+
+    /**
+     * Creates a displayable error message to summarize all errors encountered after an execution of deleteFromSourceActionPermitted.
+     * @return an error message if any errors were encountered, null otherwise.
+     */
+    public String generateDeleteFromSourceActionPermittedErrorMessage(){
+        StringBuilder errorMessage = new StringBuilder();
+        if(!directoryHandler.isSourceIsValidFlag()){
+            errorMessage.append("invalid source directory, ");
+        }
+        else if(!directoryHandler.isSourceFilesIsValidSet()){
+            errorMessage.append("invalid source files, ");
+        }
+        else if(directoryHandler.isSourceEqualsTargetFlag()){
+            errorMessage.append("source = target directory, ");
+        }
+        else if(isNoSourceFilesFlag()){
+            errorMessage.append("empty source directory, ");
+        }
+
+        if(errorMessage.isEmpty()){
+            return null;
+        }
+        else{
+            errorMessage.delete(errorMessage.length() - 2, errorMessage.length()); // This is supposed to remove the last ', ' from the error message.
+            return BackEndErrors.ERROR_3_0.toString() + " Errors: " + String.valueOf(errorMessage) + ".";
         }
     }
 
@@ -300,6 +387,17 @@ public class ActionHandler {
     }
 
     /**
+     * Creates a displayable error message to summarize all errors encountered after an execution of deleteFromSource.
+     * @return a pair whose key is an error message and value is an error code message if any errors were encountered, null otherwise.
+     */
+    public Pair<String, String> generateDeleteFromSourceErrorMessage(){
+        if(deleteFromSourceDidNotCompleteFlag){
+            return new Pair<>(BackEndErrors.ERROR_3_1.toString(), "Error (code 3.1)");
+        }
+        return null;
+    }
+
+    /**
      * Creates a displayable confirmation message that summarizes the current copy operation.
      * @return a message if the current copy request is permitted, null otherwise.
      */
@@ -309,6 +407,22 @@ public class ActionHandler {
                 return "Copy " + directoryHandler.sourceFilesSize() + " file (" + FileUtils.byteCountToDisplaySize(directorySize(directoryHandler.sourceFilesCopy())) + ") to " + directoryHandler.getTargetDirectoryName() + "?";
             }
             return "Copy " + directoryHandler.sourceFilesSize() + " files (" + FileUtils.byteCountToDisplaySize(directorySize(directoryHandler.sourceFilesCopy())) + ") to " + directoryHandler.getTargetDirectoryName() + "?";
+        }
+        else{
+            return null;
+        }
+    }
+
+    /**
+     * Creates a displayable confirmation message that summarizes the current delete operation.
+     * @return a message if the current delete request is permitted, null otherwise.
+     */
+    public String generateDeleteConfirmationMessage(){
+        if(deleteFromSourceActionPermitted()) {
+            if(directoryHandler.sourceFilesSize() == 1){
+                return "Delete " + directoryHandler.sourceFilesSize() + " file (" + FileUtils.byteCountToDisplaySize(directorySize(directoryHandler.sourceFilesCopy())) + ") from " + directoryHandler.getSourceDirectoryName() + "? This action cannot be undone.";
+            }
+            return "Delete " + directoryHandler.sourceFilesSize() + " files (" + FileUtils.byteCountToDisplaySize(directorySize(directoryHandler.sourceFilesCopy())) + ") from " + directoryHandler.getSourceDirectoryName() + "? This action cannot be undone.";
         }
         else{
             return null;
@@ -393,5 +507,13 @@ public class ActionHandler {
 
     private void setCopyFilesIOExceptionFlag(boolean copyFilesIOExceptionFlag) {
         this.copyFilesIOExceptionFlag = copyFilesIOExceptionFlag;
+    }
+
+    public boolean isDeleteFromSourceDidNotCompleteFlag() {
+        return deleteFromSourceDidNotCompleteFlag;
+    }
+
+    private void setDeleteFromSourceDidNotCompleteFlag(boolean deleteFromSourceDidNotCompleteFlag) {
+        this.deleteFromSourceDidNotCompleteFlag = deleteFromSourceDidNotCompleteFlag;
     }
 }
